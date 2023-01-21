@@ -1,9 +1,18 @@
-# TeX Live on the fly: flytex
+# TeX Live on the fly
+
+
+## Background
+
+Initially, *flytex* was part of [this project](https://github.com/indrjo/minimal-texlive-installer.git), because it wouldn't have come to life without it and the [criticisms](https://github.com/indrjo/minimal-texlive-installer#criticisms) listed there. *flytex* aims just to be a mature and a valid replacement of *texliveonfly*, indeed.
+
+Historically, *flytex* was first designed in Haskell. Afterwards, I decided to write it in Python too for the simple reason of portability: nearly every GNU/Linux distro ships a Python interpreter and some basic libraries. Which Python? Nowadays, Python 2 is gradually fading away: thus, you should have Python 3.
+
+**(Attention)** However, the Haskell version is the main work. New features, changes and fixes will be applied to it first, and afterwards to the other implementations.
 
 
 ## Usage
 
-There is no sophistication here: after you have installed *flytex* you can use it as follows:
+There is no sophistication here: after you have installed *flytex* ([click](#installation)) you can use it as follows:
 ```
 $ flytex --c COMPILER --i TEX-FILE
 ```
@@ -16,21 +25,17 @@ and install any required package that is massing from your minimal TeX Live.
 
 ## Installation
 
-*flytex* comes here written in different languages. If you want the *flytex* written in the language ```LANG```, just look for ```flytex/LANG```: there you will find the program in a single file and its own installer.
+*flytex* comes here written in different languages. If you want the *flytex* written in the language *LANG*, just look for the directory ```./LANG```: if it exists, there you will find the program in a single file and its own installer.
 
-Historically, *flytex* was first designed in Haskell. Afterwards, I decided to write it in Python too. This language is probably present in every GNU/Linux distro, so one isn't forced to install Haskell on its machine.
-
-To install *flytex*,
+Namely, you can install *flytex* as follows:
 ```
-$ cd /path/to/flytex/LANG
+$ cd ./LANG
 $ ./make.sh
 ```
 
-As the installation ends, a program called ```flytex``` will appear in ```~/.local/bin``` (it will be created if absent), so make it sure this path is in your ```PATH```.
-
-To uninstall *flytex*,
+As the installation ends, a program ```flytex``` will appear in ```~/.local/bin``` (which will be created if absent), so make sure this path is in your ```PATH```. Thus, getting rid of *flytex* is simple:
 ```
 $ rm ~/.local/bin/flytex
 ```
 
-**(Attention)** Read also ```flytex/LANG/INSTALL.md``` (if present) for other info.
+**(Attention)** If present, read also ```./LANG/INSTALL.md```.
