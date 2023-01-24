@@ -229,7 +229,9 @@ def flytex(tex_cmd):
         (exit_code, out_str, _) = flytex_exec(tex_cmd)
       else:
         tlmgr_says_error(str_res)
-  flytex_says('END!')
+        # At this point, we shall break the loop.
+        break
+  flytex_says(f'END!')
 
 
 # -------------------------------------------------------------------------
