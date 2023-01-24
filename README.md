@@ -38,4 +38,4 @@ As the installation ends, a program ```flytex``` will appear in ```~/.local/bin`
 $ rm ~/.local/bin/flytex
 ```
 
-**(Attention)** If present, read also ```./LANG/INSTALL.md```.
+**(Attention)** If present, read also ```./LANG/README.md```.
