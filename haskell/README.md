@@ -1,4 +1,6 @@
-# Requirements
+# Haskell flytex
+
+## Requirements
 
 Make sure you have all the needed Haskell modules:
 ```
