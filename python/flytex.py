@@ -5,15 +5,15 @@ import shlex as sh
 import sys
 import re
 
+
 # -------------------------------------------------------------------------
 # HOW THE PROGRAM COMMUNICATES
 # -------------------------------------------------------------------------
 
 # The general way, to say things.
 
-
 def say(hdl, who, text):
-    print('[' + who + '] ' + text, file=hdl)
+    print('[{}] {}'.format(who, text), file=hdl)
 
 
 def flytex_says(text):
@@ -45,20 +45,22 @@ def tlmgr_says_error(text):
 # System.Process and the return type slightly changed: take a string as
 # input, which is assumed to be a shell command, and make the underlying
 # system run it.
+
 def exec_sys_cmd(cmd, inp=''):
     process = prc.Popen(
         sh.split(cmd), stdin=prc.PIPE, stdout=prc.PIPE, stderr=prc.PIPE)
     out, err = process.communicate(input=inp)
     exit_code = process.returncode
-    return \
+    return (
         exit_code, out.decode('UTF-8').strip(), err.decode('UTF-8').strip()
+    )
+
 
 # For the future, it s best we use the following functions, which wraps
 # the previous one.
 
-
 def flytex_exec(cmd, inp=''):
-    flytex_says('running \'' + cmd + '\'...')
+    flytex_says("running '{}'...".format(cmd))
     return exec_sys_cmd(cmd)
 
 
@@ -75,24 +77,26 @@ def flytex_exec(cmd, inp=''):
 #  $ tlmgr install <pkg>
 #
 # and wait tlmgr to end.
+
 def tlmgr_install(pkg):
     exit_code = flytex_exec('tlmgr install ' + pkg)[0]
-    exit_text = \
-        'installed \'' + pkg + '\'' if exit_code == 0 \
-        else 'cannot install \'' + pkg + '\'!'
-    return exit_code, exit_text
+    if exit_code == 0:
+        return (0, "installed '{}'".format(pkg))
+    else:
+        return (exit_code, "cannot install '{}'!".format(pkg))
+
 
 # It is best we provide a function to perform multiple installations. For
 # a list of packages corresponding to a given missing file, install them
 # one by one; just stop with a Left message as one cannot be installed.
-
 
 def tlmgr_multiple_install(fp, pkgs):
     for pkg in pkgs:
         (exit_code, exit_text) = tlmgr_install(pkg)
         if exit_code != 0:
             return (exit_code, exit_text)
-    return (0, 'all missing packages for \'' + fp + '\' installed')
+    return (0, "all missing packages for '{}' installed".format(fp))
+
 
 # Let us turn our focus on searching packages now. To do so, let us start
 # from a descriptive example.
@@ -137,7 +141,6 @@ def tlmgr_multiple_install(fp, pkgs):
 # the packages containing the given file: concretely, this means to filter
 # the lines ending with ":".
 
-
 def find_packages(lns):
     pkgs = []
     for ln in lns:
@@ -146,8 +149,8 @@ def find_packages(lns):
             pkgs.append(pkg)
     return pkgs
 
-# Make tlmgr look for packages containing the given file.
 
+# Make tlmgr look for packages containing the given file.
 
 def tlmgr_search(fp):
     exit_code, out_str, err_str = \
@@ -162,15 +165,15 @@ def tlmgr_search(fp):
     else:
         return exit_code, err_str
 
+
 # Now, let us combine the tasks above into one: search and install all the
 # packages containing a given file.
-
 
 def tlmgr_search_and_install(fp):
     (exit_code, search_res) = tlmgr_search(fp)
     if exit_code == 0:
-        if search_res == None:
-            return (1, 'nothing to install for \'' + fp + '\'!')
+        if search_res is None:
+            return (1, "nothing to install for '{}'!".format(fp))
         else:
             # search_res in this case is a list
             return tlmgr_multiple_install(fp, search_res)
@@ -196,11 +199,12 @@ def tlmgr_search_and_install(fp):
 # Read the command line options passed to the program and either create a
 # TeXCommand to be issued to the system or present a complaint.
 # !!! Temporary!
+
 def make_TeX_command():
     try:
         opts = sys.argv[1:4]
         return ' '.join(opts)
-    except:
+    except Exception:
         return 'error making command...'
 
 
@@ -210,24 +214,24 @@ def make_TeX_command():
 
 # Inspect a string for a certain pattern to get the name of the missing
 # package. The output is always a list with length <=1.
+
 def find_missings(err_str):
     try:
         # !!! The unique failure reason here is that err_str cannot match the
         # !!! given pattern, in which case re.match returns None. In fact the
         # !!! method .groups() cannot be applied to a None object.
-        not_found = \
-            re.match(
-                '! (?:La)*TeX Error: File `([^\']+)\' not found.', err_str)
+        not_found = re.match(
+            r'! (?:La)*TeX Error: File `([^\']+)\' not found\.', err_str)
         return list(not_found.groups())
-    except:
+    except Exception:
         # If no match, just return the empty list.
         return []
+
 
 # This giant function takes a TeXCommand element and make the underlying
 # system run it. If no error arises, fine; otherwise, the program tries to
 # detect missing files, looks for missing packages containing it and
 # installs them; thus, a new attempt to run the same TeXCommand is made.
-
 
 def flytex(tex_cmd):
     (exit_code, out_str, _) = flytex_exec(tex_cmd)
@@ -248,7 +252,7 @@ def flytex(tex_cmd):
                 tlmgr_says_error(str_res)
                 # At this point, we shall break the loop.
                 break
-    flytex_says(f'END!')
+    flytex_says('END!')
 
 
 # -------------------------------------------------------------------------
