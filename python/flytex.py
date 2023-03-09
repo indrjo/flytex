@@ -6,30 +6,14 @@ import sys
 import re
 
 
-# -------------------------------------------------------------------------
-# HOW THE PROGRAM COMMUNICATES
-# -------------------------------------------------------------------------
+class Log:
+    @staticmethod
+    def err(app: str, msg: str) -> None:
+        print('[{}-error] {}'.format(app, msg), file=sys.stderr)
 
-# The general way, to say things.
-
-def say(hdl, who, text):
-    print('[{}] {}'.format(who, text), file=hdl)
-
-
-def flytex_says(text):
-    say(sys.stdout, 'flytex', text)
-
-
-def flytex_says_error(text):
-    say(sys.stderr, 'flytex-error', text)
-
-
-def tlmgr_says(text):
-    say(sys.stdout, 'tlmgr', text)
-
-
-def tlmgr_says_error(text):
-    say(sys.stderr, 'tlmgr-error', text)
+    @staticmethod
+    def info(app: str, msg: str) -> None:
+        print('[{}] {}'.format(app, msg))
 
 
 # --------------------------------------------------------------------------
@@ -60,7 +44,7 @@ def exec_sys_cmd(cmd, inp=''):
 # the previous one.
 
 def flytex_exec(cmd, inp=''):
-    flytex_says("running '{}'...".format(cmd))
+    Log.info('flytex', "running '{}'...".format(cmd))
     return exec_sys_cmd(cmd)
 
 
@@ -241,18 +225,18 @@ def flytex(tex_cmd):
         tex_err = next(ln for ln in out_str.split('\n') if ln.startswith('!'))
         missings = find_missings(tex_err)
         if missings == []:
-            flytex_says_error(tex_err)
+            Log.err('flytex', tex_err)
             return None
         else:
             (exit_code, str_res) = tlmgr_search_and_install(missings[0])
             if exit_code == 0:
-                tlmgr_says(str_res)
+                Log.info('tlmgr', str_res)
                 (exit_code, out_str, _) = flytex_exec(tex_cmd)
             else:
-                tlmgr_says_error(str_res)
+                Log.err('tlmgr', str_res)
                 # At this point, we shall break the loop.
                 break
-    flytex_says('END!')
+    Log.info('flytex', 'END!')
 
 
 # -------------------------------------------------------------------------
