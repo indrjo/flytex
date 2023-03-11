@@ -105,8 +105,8 @@ class Tlmgr:
     def search_and_install(missing_file: str) -> bool:
         ''' Search and install all packages containing a given file. '''
         packages = Tlmgr.search(missing_file)
-        Log.info('tlmgr', 'downloading packages for "{}": {}'.format(
-            missing_file, packages))
+        Log.info('tlmgr', 'downloading {} missing packages: {}'.format(
+            len(packages), packages))
         if packages and Tlmgr.install_all(packages):
             Log.info('tlmgr', 'all missing packages for "{}" installed'.format(
                 missing_file))
@@ -137,6 +137,8 @@ class FlyTex:
         # if not texer_cmd:
         #    raise RuntimeError('Could not find executable "{}"'.format(texer))
 
+        # This trick will gather all missing files in one compilation.
+        # Sending the return key '\n' so many times will load up to 100 errors
         ans = Shell.run([texer] + args, b'\n' * 99)
         missing = ans.findall(FlyTex.RX_MISSING)
         if not missing:
@@ -144,6 +146,8 @@ class FlyTex:
                 for error in ans.findall(FlyTex.RX_ERROR_LINES):
                     Log.err(texer, error)
             return
+        Log.info('flytex', 'found {} missing files: {}'.format(
+            len(missing), missing))
         Tlmgr.search_and_install_all(missing)
         Log.info('flytex', 'END!')
 
