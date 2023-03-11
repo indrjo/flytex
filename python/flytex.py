@@ -144,15 +144,16 @@ class FlyTex:
         # Sending the return key '\n' so many times will load up to 100 errors
         ans = Shell.run([texer] + args, b'\n' * 99)
         missing = ans.findall(FlyTex.RX_MISSING)
-        if not missing:
-            if ans.returncode != 0:
+        if ans.returncode != 0:
+            if missing:
+                Log.info('flytex', 'found {} missing files: {}'.format(
+                    len(missing), missing))
+                Tlmgr.search_and_install_all(missing)
+            else:
                 for error in ans.findall(FlyTex.RX_ERROR_LINES):
                     Log.err(texer, error)
-            exit(1)
-        Log.info('flytex', 'found {} missing files: {}'.format(
-            len(missing), missing))
-        Tlmgr.search_and_install_all(missing)
         Log.info('flytex', 'END!')
+        exit(ans.returncode)
 
 
 # -------------------------------------------------------------------------
