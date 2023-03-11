@@ -7,11 +7,11 @@ try:  # argparse (>3.2) can be omitted with a simplified sys.argv logic below
     ARGPARSE_ENABLED = True
 except Exception:
     ARGPARSE_ENABLED = False
-# try:  # If we cannot load shutil.which (>3.3), fallback to plain text
-#     from shutil import which
-# except Exception:
-#     def which(cmd: str, mode: int, path: str) -> str:  # type: ignore
-#         return cmd
+try:  # If we cannot load shutil.which (>3.3), fallback to plain text
+    from shutil import which
+except Exception:
+    def which(cmd: str) -> str:  # type: ignore
+        return cmd
 
 
 class Log:
@@ -45,6 +45,13 @@ class Shell:
     @staticmethod
     def run(args: list, inp: bytes = b'') -> Result:
         Log.info('flytex', 'running: {} ...'.format(' '.join(args)))
+        exe_fullpath = which(args[0])
+        if exe_fullpath:
+            args[0] = exe_fullpath
+        else:
+            Log.err('os', 'Could not find executable "{}"'.format(args[0]))
+            exit(1)
+
         proc = Popen(args, stdin=PIPE, stdout=PIPE, stderr=PIPE)
         out, err = proc.communicate(input=inp)
         return Shell.Result(proc.returncode, out, err)
@@ -133,11 +140,7 @@ class FlyTex:
     @staticmethod
     def run(texer: str, args: list) -> None:
         ''' Inspect output to get the names of the missing packages. '''
-        # texer_cmd = which(texer) or ''
-        # if not texer_cmd:
-        #    raise RuntimeError('Could not find executable "{}"'.format(texer))
-
-        # This trick will gather all missing files in one compilation.
+        # This trick gathers all missing files in one compilation.
         # Sending the return key '\n' so many times will load up to 100 errors
         ans = Shell.run([texer] + args, b'\n' * 99)
         missing = ans.findall(FlyTex.RX_MISSING)
@@ -145,7 +148,7 @@ class FlyTex:
             if ans.returncode != 0:
                 for error in ans.findall(FlyTex.RX_ERROR_LINES):
                     Log.err(texer, error)
-            return
+            exit(1)
         Log.info('flytex', 'found {} missing files: {}'.format(
             len(missing), missing))
         Tlmgr.search_and_install_all(missing)
