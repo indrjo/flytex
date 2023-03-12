@@ -7,7 +7,9 @@ Initially, *flytex* was part of [this project](https://github.com/indrjo/minimal
 
 Historically, *flytex* was first designed in Haskell. Afterwards, I decided to write it in Python too for the simple reason of portability: nearly every GNU/Linux distro ships a Python interpreter and some basic libraries. Which Python? Nowadays, Python 2 is gradually fading away: thus, you should have Python 3.
 
-**(Attention)** However, the Haskell version is the main work. New features, changes and fixes will be applied to it first, and afterwards to the other implementations.
+By the way, the Haskell version is the main work. New features, changes and fixes will be applied to it first, and afterwards to the other implementations.
+
+Special thanks goes to @relikd, who dedicated some time to rewrite the Python implementation in a more *pythonic* fashion and suggested a nice trick to get all the missing packages in one go. This idea works particularly fine with Haskell, because of its laziness.
 
 
 ## Usage
