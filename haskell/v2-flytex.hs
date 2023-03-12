@@ -1,6 +1,6 @@
 #!/usr/bin/env runghc
 
-module FlyTex where
+module Main where
 
 -- As you can see from the list of imports below, there are few modules the
 -- program requires to work properly.
@@ -11,17 +11,15 @@ module FlyTex where
 -- !!!
 -- !!! No particular version?
 
+import Control.Monad (filterM)
+import Control.Conditional (when, unless)
 import Data.List (isSuffixOf, intercalate, (\\))
-import Data.Maybe (catMaybes)
---import Text.Regex.PCRE ((=~))
+import Data.Either
 import qualified Text.Regex.PCRE.Light.Char8 as PCRE
 import System.Process (readCreateProcessWithExitCode, shell)
 import System.Exit (ExitCode(..))
---import System.Directory (doesFileExist)
 import System.IO (hPutStrLn, stdout, stderr, Handle)
 import Options
-
---import System.Environment -- (getArgs)
 
 -- ------------------------------------------------------------------------
 -- 0. THE MAIN
@@ -33,8 +31,7 @@ import Options
 -- is the core of the program: while texing, needed but abset packages are
 -- installed "on the fly".
 main :: IO ()
-main = makeTeXCommand >>=
-  either flytexSaysError flytex
+main = makeTeXCommand >>= either flytexSaysError flytex
 
 
 -- ------------------------------------------------------------------------
@@ -52,19 +49,14 @@ main = makeTeXCommand >>=
 -- The output is a triple: the exit code and two strings containing the
 -- standard output and error. See remarks below.
 exec :: String -> String -> String -> IO (ExitCode, String, String)
-exec intro comm instr =
+exec intro comm instr = do
   -- !!! Sometimes it may be of comfort for the user to have some witness
   -- !!! of life from the program. Sometimes if is not. How to decide?
-  flytexSays intro >>
+  unless (null intro) (flytexSays intro)
   -- The interface of Haskell for interacting with the underlying operating
   -- system is summoned: just two functions! This is a delicate place and
   -- strongly depends on the platform where the program runs. Extreme care.
   readCreateProcessWithExitCode (shell comm) instr
-  -- !!! Insert criticisms here... !!!
-
-{- REMARK: the commands that we run here...
-  ...
--}
 
 
 -- ------------------------------------------------------------------------
@@ -77,23 +69,22 @@ exec intro comm instr =
 
 -- Installing packages is the simpler part here, you just have to type
 --  $ tlmgr install PACKAGE
--- and wait tlmgr to end.
-tlmgrInstall :: String -> IO ExitCode
+-- and wait tlmgr to end. Take as input the name of a package you want to 
+-- install, attempt to do it and eventually return a boolean value, with
+-- True indicating that the installation has ended successfully and False
+-- if otherwise.
+tlmgrInstall :: String -> IO Bool
 tlmgrInstall pkg =
   exec ("installing " ++ pkg ++ "...")
        ("tlmgr install " ++ pkg) "" >>=
-    \(exit_code, _, _) -> return exit_code
+    \(exit_code, _, _) -> return $ exit_code == ExitSuccess
+    -- !!! This function ignores completely any output of `tlmgr install`.
 
 -- It is best we provide a function to perform multiple installations. For
 -- a list of packages, try to install all them. The output is a list of all
--- the packages for which the installation has failed.
+-- the packages for which the installation has failed for some reason.
 tlmgrMultipleInstalls :: [String] -> IO [String]
-tlmgrMultipleInstalls [] = return []
-tlmgrMultipleInstalls (pkg:pkgs) =
-  tlmgrInstall pkg >>=
-    \exit_code -> case exit_code of
-      ExitSuccess -> tlmgrMultipleInstalls pkgs
-      _ -> fmap (pkg :) (tlmgrMultipleInstalls pkgs)
+tlmgrMultipleInstalls = filterM (fmap not . tlmgrInstall)
 
 -- Let us turn our focus on searching packages now. To do so, let us start
 -- from a descriptive example.
@@ -115,8 +106,8 @@ tlmgrMultipleInstalls (pkg:pkgs) =
 -- | mcaption:
 -- | 	 texmf-dist/tex/latex/mcaption/mcaption.sty
 --
--- The first line just tells the repository interrogated, we cannot do not
--- care here. The other lines are the ones very interesting: there is a
+-- The first line just tells the repository interrogated, we do not care of
+-- of that here. The other lines are the ones very interesting: there is a
 -- sequence of
 -- 
 --  package:
@@ -125,9 +116,9 @@ tlmgrMultipleInstalls (pkg:pkgs) =
 --    ...
 --    pathN
 --
--- In our example, the paths end with `caption.sty`. In this case, we are
--- looking for exactly `caption.sty` and not for, say, `ccaption.sty`. This
--- problem can be easily solved putting a "/", as follows:
+-- In our example, the paths end with `caption.sty`. But we want only the
+-- file `caption.sty` and not, say, `ccaption.sty`. This problem can be 
+-- easily solved putting a "/", as follows:
 --
 -- | $ tlmgr search --global --file /caption.sty
 -- | tlmgr: package repository [...]
@@ -140,11 +131,13 @@ tlmgrMultipleInstalls (pkg:pkgs) =
 findPackages :: [String] -> [String]
 findPackages = map init . filter (isSuffixOf ":")
 
--- Make tlmgr look for packages containing the given file.
-tlmgrSearch :: String -> IO (Maybe [String])
-tlmgrSearch fp =
-    exec ("looking for packages containing " ++ fp ++ "...")
-         ("tlmgr search --global --file /" ++ fp) "" >>=
+-- Make tlmgr look for packages containing the given file. Take a string,
+-- a filename, and search for packages containing it. If there are packages
+-- for that file return Right (that list), else return Left (the filename).
+-- The reason behind such output lies on the next function.
+tlmgrSearch :: String -> IO (Either String [String])
+tlmgrSearch fname =
+    exec "" ("tlmgr search --global --file /" ++ fname) "" >>=
       \(exit_code, out_str, _) ->
         return $ case exit_code of
           ExitSuccess ->
@@ -153,17 +146,25 @@ tlmgrSearch fp =
           -- remaining lines if there are some.
             case lines out_str of
               _:out_lns' ->
-                  Just (findPackages out_lns')
-              _ -> Nothing
+                let pkgsFound = findPackages out_lns' in
+                  if null pkgsFound then Left fname else Right pkgsFound  
+              _ -> Left fname
           -- Otherwise, just collect all the error message, to be presented
           -- to the user in future.
-          ExitFailure _ -> Nothing
+          ExitFailure _ -> Left fname
 
--- Given a list of filenames, look for the packages containing them and
--- an store all the names of the packages to install in one list.
-tlmgrMultipleSearches :: [String] -> IO [String]
-tlmgrMultipleSearches names =
-  fmap (concat . catMaybes) (mapM tlmgrSearch names)
+-- Given a list of filenames, look for packages containing them. It is 
+-- returned a pair of lists:
+--  * the first component is the list of the filenames for which there is 
+--    no package, the "orphans"
+--  * the second component is the list of all the packages found.
+tlmgrMultipleSearches :: [String] -> IO ([String], [String])
+tlmgrMultipleSearches fnames = -- do
+  {- flytexSays $ "searching packages for: "
+               ++ intercalate ", " fnames -}
+  mapM tlmgrSearch fnames >>=
+    \eithers -> return (lefts eithers, concat (rights eithers))
+
 
 -- ------------------------------------------------------------------------
 -- # FIND THE MISSING PACKAGES
@@ -299,25 +300,33 @@ flytex texCmd@(TeXCommand compiler options fname) =
   -- allows the user to type something after '?'.
   exec ("compiling " ++ fname ++ "..." )
        (unwords [compiler, options, fname]) (cycle "\n") >>=
-                                          -- ^ the trick
     \(_, out_str, _) ->
       let missings = filterMissings out_str in
         case missings of
-          [] ->
-            flytexSays "end!"
-          _ ->
-            (tlmgrMultipleInstalls =<< tlmgrMultipleSearches missings) >>=
-              \fails -> case fails of
-                [] -> do
-                  flytexSays "missing packages installed!"
-                  flytex texCmd -- compiler options fname
-                _ ->
-                  flytexSaysError $ "failed to install the packages: "
-                                    ++ intercalate ", " fails
+          [] -> flytexSays "end!"
+          _ -> do
+            flytexSays $ "searching packages for: "
+                         ++ intercalate ", " missings
+            tlmgrMultipleSearches missings >>=
+              \(orphans, pkgsFound) -> do
+                unless (null orphans) $
+                  flytexSaysError $ "there are orphans: " ++
+                                    intercalate ", " orphans
+                case pkgsFound of
+                  [] ->
+                    flytexSaysError "I cannot retrieve packages!"
+                  _ ->
+                    tlmgrMultipleInstalls pkgsFound >>=
+                      \fails -> case fails of
+                        [] -> do
+                          when (null orphans) (flytex texCmd)
+                        _ ->
+                          flytexSaysError $ "failed to install: "
+                                            ++ intercalate ", " fails
 
 
 -- ------------------------------------------------------------------------
--- 5. HOW THE PROGRAM COMMUNICATES
+-- # HOW THE PROGRAM COMMUNICATES
 -- ------------------------------------------------------------------------
 
 -- !!! No fatal massages here, that is no message will abort the execution
